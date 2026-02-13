@@ -13,8 +13,10 @@ def generate_sql_with_openai(query_text: str, schema_info: Dict[str, Any]) -> st
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable not set")
-        
-        client = OpenAI(api_key=api_key)
+
+        # Get base URL from environment (optional)
+        base_url = os.environ.get("OPENAI_BASE_URL")
+        client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
         
         # Format schema for prompt
         schema_description = format_schema_for_prompt(schema_info)
@@ -151,7 +153,9 @@ def generate_natural_language_query_with_openai(schema_info: Dict[str, Any]) -> 
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable not set")
 
-        client = OpenAI(api_key=api_key)
+        # Get base URL from environment (optional)
+        base_url = os.environ.get("OPENAI_BASE_URL")
+        client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
 
         # Format schema for prompt
         schema_description = format_schema_for_prompt(schema_info)
