@@ -12,6 +12,7 @@ from core.data_models import (
     FileUploadResponse,
     QueryRequest,
     QueryResponse,
+    GenerateQueryResponse,
     DatabaseSchemaResponse,
     InsightsRequest,
     InsightsResponse,
@@ -20,7 +21,7 @@ from core.data_models import (
     ColumnInfo
 )
 from core.file_processor import convert_csv_to_sqlite, convert_json_to_sqlite, convert_jsonl_to_sqlite
-from core.llm_processor import generate_sql
+from core.llm_processor import generate_sql, generate_natural_language_query
 from core.sql_processor import execute_sql_safely, get_database_schema
 from core.insights import generate_insights
 from core.sql_security import (
@@ -113,18 +114,18 @@ async def process_natural_language_query(request: QueryRequest) -> QueryResponse
     try:
         # Get database schema
         schema_info = get_database_schema()
-        
+
         # Generate SQL using routing logic
         sql = generate_sql(request, schema_info)
-        
+
         # Execute SQL query
         start_time = datetime.now()
         result = execute_sql_safely(sql)
         execution_time = (datetime.now() - start_time).total_seconds() * 1000
-        
+
         if result['error']:
             raise Exception(result['error'])
-        
+
         response = QueryResponse(
             sql=sql,
             results=result['results'],
@@ -143,6 +144,34 @@ async def process_natural_language_query(request: QueryRequest) -> QueryResponse
             columns=[],
             row_count=0,
             execution_time_ms=0,
+            error=str(e)
+        )
+
+@app.post("/api/generate-query", response_model=GenerateQueryResponse)
+async def generate_query_endpoint() -> GenerateQueryResponse:
+    """Generate a natural language query based on database schema"""
+    try:
+        # Get database schema
+        schema_info = get_database_schema()
+
+        # Check if there are any tables
+        if not schema_info.get('tables') or len(schema_info['tables']) == 0:
+            return GenerateQueryResponse(
+                query="",
+                error="No tables available. Please upload data first."
+            )
+
+        # Generate natural language query
+        query = generate_natural_language_query(schema_info)
+
+        response = GenerateQueryResponse(query=query)
+        logger.info(f"[SUCCESS] Natural language query generated: {query}")
+        return response
+    except Exception as e:
+        logger.error(f"[ERROR] Query generation failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return GenerateQueryResponse(
+            query="",
             error=str(e)
         )
 

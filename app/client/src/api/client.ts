@@ -55,6 +55,13 @@ export const api = {
       body: JSON.stringify(request)
     });
   },
+
+  // Generate natural language query
+  async generateQuery(): Promise<GenerateQueryResponse> {
+    return apiRequest<GenerateQueryResponse>('/generate-query', {
+      method: 'POST'
+    });
+  },
   
   // Get database schema
   async getSchema(): Promise<DatabaseSchemaResponse> {

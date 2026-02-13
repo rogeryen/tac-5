@@ -141,6 +141,109 @@ def format_schema_for_prompt(schema_info: Dict[str, Any]) -> str:
     
     return "\n".join(lines)
 
+def generate_natural_language_query_with_openai(schema_info: Dict[str, Any]) -> str:
+    """
+    Generate natural language query using OpenAI API
+    """
+    try:
+        # Get API key from environment
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable not set")
+
+        client = OpenAI(api_key=api_key)
+
+        # Format schema for prompt
+        schema_description = format_schema_for_prompt(schema_info)
+
+        # Create prompt
+        prompt = f"""Given the following database schema:
+
+{schema_description}
+
+Generate ONE interesting natural language query that a user could ask about this data. The query should be clear, specific, and no more than two sentences. Do not include any SQL, only the natural language question.
+
+The query should demonstrate interesting capabilities like filtering, aggregation, or comparisons. Make it sound natural and conversational, not technical.
+
+Natural Language Query:"""
+
+        # Call OpenAI API
+        response = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that generates interesting natural language questions about data."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=100
+        )
+
+        query = response.choices[0].message.content.strip()
+
+        return query
+
+    except Exception as e:
+        raise Exception(f"Error generating natural language query with OpenAI: {str(e)}")
+
+def generate_natural_language_query_with_anthropic(schema_info: Dict[str, Any]) -> str:
+    """
+    Generate natural language query using Anthropic API
+    """
+    try:
+        # Get API key from environment
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise ValueError("ANTHROPIC_API_KEY environment variable not set")
+
+        client = Anthropic(api_key=api_key)
+
+        # Format schema for prompt
+        schema_description = format_schema_for_prompt(schema_info)
+
+        # Create prompt
+        prompt = f"""Given the following database schema:
+
+{schema_description}
+
+Generate ONE interesting natural language query that a user could ask about this data. The query should be clear, specific, and no more than two sentences. Do not include any SQL, only the natural language question.
+
+The query should demonstrate interesting capabilities like filtering, aggregation, or comparisons. Make it sound natural and conversational, not technical.
+
+Natural Language Query:"""
+
+        # Call Anthropic API
+        response = client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=100,
+            temperature=0.7,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+
+        query = response.content[0].text.strip()
+
+        return query
+
+    except Exception as e:
+        raise Exception(f"Error generating natural language query with Anthropic: {str(e)}")
+
+def generate_natural_language_query(schema_info: Dict[str, Any]) -> str:
+    """
+    Route to appropriate LLM provider to generate natural language query.
+    Priority: 1) OpenAI API key exists, 2) Anthropic API key exists
+    """
+    openai_key = os.environ.get("OPENAI_API_KEY")
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+
+    # Check API key availability (OpenAI priority)
+    if openai_key:
+        return generate_natural_language_query_with_openai(schema_info)
+    elif anthropic_key:
+        return generate_natural_language_query_with_anthropic(schema_info)
+    else:
+        raise ValueError("No LLM API keys configured. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY.")
+
 def generate_sql(request: QueryRequest, schema_info: Dict[str, Any]) -> str:
     """
     Route to appropriate LLM provider based on API key availability and request preference.
@@ -148,13 +251,13 @@ def generate_sql(request: QueryRequest, schema_info: Dict[str, Any]) -> str:
     """
     openai_key = os.environ.get("OPENAI_API_KEY")
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
-    
+
     # Check API key availability first (OpenAI priority)
     if openai_key:
         return generate_sql_with_openai(request.query, schema_info)
     elif anthropic_key:
         return generate_sql_with_anthropic(request.query, schema_info)
-    
+
     # Fall back to request preference if both keys available or neither available
     if request.llm_provider == "openai":
         return generate_sql_with_openai(request.query, schema_info)
